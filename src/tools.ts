@@ -66,6 +66,46 @@ export class XTools {
     manageLike: z.object({
       tweetId: z.string().min(1).describe('Tweet ID to like/unlike'),
       action: z.enum(['like', 'unlike']).describe('Action to perform: like or unlike')
+    }),
+    
+    // List Operations
+    getMyLists: z.object({}),
+    
+    getList: z.object({
+      listId: z.string().min(1).describe('List ID to fetch')
+    }),
+    
+    getListTweets: z.object({
+      listId: z.string().min(1).describe('List ID to get tweets from'),
+      limit: z.number().min(1).max(100).default(10).describe('Number of tweets to fetch (1-100)')
+    }),
+    
+    getListMembers: z.object({
+      listId: z.string().min(1).describe('List ID to get members from'),
+      limit: z.number().min(1).max(100).default(10).describe('Number of members to fetch (1-100)')
+    }),
+    
+    createList: z.object({
+      name: z.string().min(1).max(25).describe('List name (max 25 characters)'),
+      description: z.string().max(100).optional().describe('List description (max 100 characters)'),
+      private: z.boolean().default(false).describe('Whether the list should be private')
+    }),
+    
+    updateList: z.object({
+      listId: z.string().min(1).describe('List ID to update'),
+      name: z.string().min(1).max(25).optional().describe('New list name (max 25 characters)'),
+      description: z.string().max(100).optional().describe('New list description (max 100 characters)'),
+      private: z.boolean().optional().describe('Whether the list should be private')
+    }),
+    
+    deleteList: z.object({
+      listId: z.string().min(1).describe('List ID to delete')
+    }),
+    
+    manageListMember: z.object({
+      listId: z.string().min(1).describe('List ID to manage'),
+      username: z.string().min(1).describe('Username to add/remove (without @)'),
+      action: z.enum(['add', 'remove']).describe('Action to perform: add or remove member')
     })
   };
   
@@ -398,6 +438,229 @@ export class XTools {
         content: [{ 
           type: "text" as const, 
           text: `Error managing like: ${error instanceof Error ? error.message : 'Unknown error'}` 
+        }]
+      };
+    }
+  }
+  
+  // List Operations
+  
+  async getMyLists(params: z.infer<typeof XTools.schemas.getMyLists>) {
+    try {
+      const lists = await this.twitterClient.getMyLists();
+      
+      if (!lists.length) {
+        return {
+          content: [{ 
+            type: "text" as const, 
+            text: 'You have no lists.' 
+          }]
+        };
+      }
+      
+      const formattedLists = this.twitterClient.formatLists(lists);
+      
+      return {
+        content: [{ 
+          type: "text" as const, 
+          text: `**Your Lists (${lists.length}):**\n\n${formattedLists}` 
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{ 
+          type: "text" as const, 
+          text: `Error fetching lists: ${error instanceof Error ? error.message : 'Unknown error'}` 
+        }]
+      };
+    }
+  }
+  
+  async getList(params: z.infer<typeof XTools.schemas.getList>) {
+    try {
+      const { listId } = params;
+      const list = await this.twitterClient.getList(listId);
+      
+      const formattedList = this.twitterClient.formatListDetails(list);
+      
+      return {
+        content: [{ 
+          type: "text" as const, 
+          text: formattedList 
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{ 
+          type: "text" as const, 
+          text: `Error fetching list: ${error instanceof Error ? error.message : 'Unknown error'}` 
+        }]
+      };
+    }
+  }
+  
+  async getListTweets(params: z.infer<typeof XTools.schemas.getListTweets>) {
+    try {
+      const { listId, limit = 10 } = params;
+      
+      // Get list details for name
+      const list = await this.twitterClient.getList(listId);
+      const tweets = await this.twitterClient.getListTweets(listId, limit);
+      
+      const formattedTweets = this.twitterClient.formatListTweets(tweets, list.name);
+      
+      return {
+        content: [{ 
+          type: "text" as const, 
+          text: formattedTweets 
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{ 
+          type: "text" as const, 
+          text: `Error fetching list tweets: ${error instanceof Error ? error.message : 'Unknown error'}` 
+        }]
+      };
+    }
+  }
+  
+  async getListMembers(params: z.infer<typeof XTools.schemas.getListMembers>) {
+    try {
+      const { listId, limit = 10 } = params;
+      
+      // Get list details for name
+      const list = await this.twitterClient.getList(listId);
+      const members = await this.twitterClient.getListMembers(listId, limit);
+      
+      const formattedMembers = this.twitterClient.formatListMembers(members, list.name);
+      
+      return {
+        content: [{ 
+          type: "text" as const, 
+          text: formattedMembers 
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{ 
+          type: "text" as const, 
+          text: `Error fetching list members: ${error instanceof Error ? error.message : 'Unknown error'}` 
+        }]
+      };
+    }
+  }
+  
+  async createList(params: z.infer<typeof XTools.schemas.createList>) {
+    try {
+      const { name, description, private: isPrivate = false } = params;
+      
+      const newList = await this.twitterClient.createList(name, description, isPrivate);
+      
+      return {
+        content: [{ 
+          type: "text" as const, 
+          text: `Successfully created list "${name}" (ID: ${newList.id})${description ? `\nDescription: ${description}` : ''}${isPrivate ? '\nPrivacy: Private' : '\nPrivacy: Public'}` 
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{ 
+          type: "text" as const, 
+          text: `Error creating list: ${error instanceof Error ? error.message : 'Unknown error'}` 
+        }]
+      };
+    }
+  }
+  
+  async updateList(params: z.infer<typeof XTools.schemas.updateList>) {
+    try {
+      const { listId, name, description, private: isPrivate } = params;
+      
+      if (!name && description === undefined && isPrivate === undefined) {
+        return {
+          content: [{ 
+            type: "text" as const, 
+            text: 'No changes specified. Please provide at least one field to update (name, description, or privacy).' 
+          }]
+        };
+      }
+      
+      await this.twitterClient.updateList(listId, name, description, isPrivate);
+      
+      const changes = [];
+      if (name) changes.push(`Name: "${name}"`);
+      if (description !== undefined) changes.push(`Description: "${description || 'No description'}"`);
+      if (isPrivate !== undefined) changes.push(`Privacy: ${isPrivate ? 'Private' : 'Public'}`);
+      
+      return {
+        content: [{ 
+          type: "text" as const, 
+          text: `Successfully updated list ${listId}\n${changes.join('\n')}` 
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{ 
+          type: "text" as const, 
+          text: `Error updating list: ${error instanceof Error ? error.message : 'Unknown error'}` 
+        }]
+      };
+    }
+  }
+  
+  async deleteList(params: z.infer<typeof XTools.schemas.deleteList>) {
+    try {
+      const { listId } = params;
+      
+      const result = await this.twitterClient.deleteList(listId);
+      const successText = result ? `Successfully deleted list ${listId}` : `Failed to delete list ${listId}`;
+      
+      return {
+        content: [{ 
+          type: "text" as const, 
+          text: successText 
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{ 
+          type: "text" as const, 
+          text: `Error deleting list: ${error instanceof Error ? error.message : 'Unknown error'}` 
+        }]
+      };
+    }
+  }
+  
+  async manageListMember(params: z.infer<typeof XTools.schemas.manageListMember>) {
+    try {
+      const { listId, username, action } = params;
+      
+      if (username.startsWith('@')) {
+        throw new Error('Username should not include @ symbol');
+      }
+      
+      let result: boolean;
+      if (action === 'add') {
+        result = await this.twitterClient.addListMember(listId, username);
+      } else {
+        result = await this.twitterClient.removeListMember(listId, username);
+      }
+      
+      const actionText = action === 'add' ? 'added to' : 'removed from';
+      const successText = result ? `Successfully ${actionText} list ${listId}: @${username}` : `Failed to ${action} @${username} ${action === 'add' ? 'to' : 'from'} list ${listId}`;
+      
+      return {
+        content: [{ 
+          type: "text" as const, 
+          text: successText 
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{ 
+          type: "text" as const, 
+          text: `Error managing list member: ${error instanceof Error ? error.message : 'Unknown error'}` 
         }]
       };
     }

@@ -292,4 +292,207 @@ Followers: ${metrics?.followers_count?.toLocaleString() || 'N/A'}`;
     
     return `**Your Home Timeline (${tweets.length} tweets):**\n\n${this.formatTweets(tweets)}`;
   }
+  
+  // List management methods
+  
+  async getMyLists(): Promise<any[]> {
+    try {
+      const client = await this.getAuthenticatedClient();
+      const response = await client.v2.listsOwned(await this.getMyUserId(), {
+        max_results: 100,
+        'list.fields': ['description', 'member_count', 'follower_count', 'private', 'created_at']
+      });
+      
+      const lists = [];
+      for await (const list of response) {
+        lists.push(list);
+      }
+      
+      return lists;
+    } catch (error) {
+      throw new Error(`Failed to fetch your lists: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+  
+  async getList(listId: string): Promise<any> {
+    try {
+      const client = await this.getAuthenticatedClient();
+      const response = await client.v2.list(listId, {
+        'list.fields': ['description', 'member_count', 'follower_count', 'private', 'created_at']
+      });
+      
+      if (!response.data) {
+        throw new Error('List not found');
+      }
+      
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to fetch list: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+  
+  async getListTweets(listId: string, maxResults: number = 10): Promise<TweetV2[]> {
+    try {
+      const client = await this.getAuthenticatedClient();
+      const response = await client.v2.listTweets(listId, {
+        max_results: Math.min(maxResults, 100),
+        'tweet.fields': ['id', 'text', 'created_at', 'public_metrics', 'author_id'],
+        expansions: ['author_id']
+      });
+      
+      return response.data.data || [];
+    } catch (error) {
+      throw new Error(`Failed to fetch list tweets: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+  
+  async getListMembers(listId: string, maxResults: number = 10): Promise<UserV2[]> {
+    try {
+      const client = await this.getAuthenticatedClient();
+      const response = await client.v2.listMembers(listId, {
+        max_results: Math.min(maxResults, 100),
+        'user.fields': ['id', 'name', 'username', 'description', 'public_metrics', 'verified']
+      });
+      
+      const members = [];
+      for await (const member of response) {
+        members.push(member);
+        if (members.length >= maxResults) break;
+      }
+      
+      return members;
+    } catch (error) {
+      throw new Error(`Failed to fetch list members: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+  
+  async createList(name: string, description?: string, isPrivate: boolean = false): Promise<any> {
+    try {
+      const client = await this.getAuthenticatedClient();
+      const response = await client.v2.createList({
+        name,
+        description,
+        private: isPrivate
+      });
+      
+      if (!response.data) {
+        throw new Error('Failed to create list');
+      }
+      
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to create list: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+  
+  async updateList(listId: string, name?: string, description?: string, isPrivate?: boolean): Promise<any> {
+    try {
+      const client = await this.getAuthenticatedClient();
+      const updateData: any = {};
+      
+      if (name !== undefined) updateData.name = name;
+      if (description !== undefined) updateData.description = description;
+      if (isPrivate !== undefined) updateData.private = isPrivate;
+      
+      const response = await client.v2.updateList(listId, updateData);
+      
+      if (!response.data?.updated) {
+        throw new Error('Failed to update list');
+      }
+      
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to update list: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+  
+  async deleteList(listId: string): Promise<boolean> {
+    try {
+      const client = await this.getAuthenticatedClient();
+      const response = await client.v2.removeList(listId);
+      
+      return response.data?.deleted || false;
+    } catch (error) {
+      throw new Error(`Failed to delete list: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+  
+  async addListMember(listId: string, username: string): Promise<boolean> {
+    try {
+      const client = await this.getAuthenticatedClient();
+      
+      // Get user ID from username
+      const userResponse = await client.v2.userByUsername(username);
+      if (!userResponse.data) {
+        throw new Error(`User @${username} not found`);
+      }
+      
+      const response = await client.v2.addListMember(listId, userResponse.data.id);
+      
+      return response.data?.is_member || false;
+    } catch (error) {
+      throw new Error(`Failed to add member to list: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+  
+  async removeListMember(listId: string, username: string): Promise<boolean> {
+    try {
+      const client = await this.getAuthenticatedClient();
+      
+      // Get user ID from username
+      const userResponse = await client.v2.userByUsername(username);
+      if (!userResponse.data) {
+        throw new Error(`User @${username} not found`);
+      }
+      
+      const response = await client.v2.removeListMember(listId, userResponse.data.id);
+      
+      return response.data?.is_member === false;
+    } catch (error) {
+      throw new Error(`Failed to remove member from list: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+  
+  // List formatting methods
+  
+  formatLists(lists: any[]): string {
+    if (!lists.length) {
+      return 'No lists found.';
+    }
+    
+    return lists.map(list => {
+      return `**${list.name}** (ID: ${list.id})
+${list.description || 'No description'}
+Members: ${list.member_count || 0} | Followers: ${list.follower_count || 0}
+Privacy: ${list.private ? 'Private' : 'Public'}
+Created: ${list.created_at ? new Date(list.created_at).toLocaleDateString() : 'N/A'}`;
+    }).join('\n\n---\n\n');
+  }
+  
+  formatListDetails(list: any): string {
+    return `**${list.name}** (ID: ${list.id})
+${list.description || 'No description'}
+
+**Stats:**
+- Members: ${list.member_count || 0}
+- Followers: ${list.follower_count || 0}
+- Privacy: ${list.private ? 'Private' : 'Public'}
+- Created: ${list.created_at ? new Date(list.created_at).toLocaleDateString() : 'N/A'}`;
+  }
+  
+  formatListTweets(tweets: TweetV2[], listName: string): string {
+    if (!tweets.length) {
+      return `No tweets found in list "${listName}".`;
+    }
+    
+    return `**Tweets from "${listName}" (${tweets.length} tweets):**\n\n${this.formatTweets(tweets)}`;
+  }
+  
+  formatListMembers(members: UserV2[], listName: string): string {
+    if (!members.length) {
+      return `No members found in list "${listName}".`;
+    }
+    
+    return `**Members of "${listName}" (${members.length} members):**\n\n${this.formatUsers(members)}`;
+  }
 }

@@ -240,6 +240,157 @@ class XProfileMCPServer {
               required: [],
             },
           },
+          {
+            name: 'get_my_lists',
+            description: 'Get your X/Twitter lists',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+              required: [],
+            },
+          },
+          {
+            name: 'get_list',
+            description: 'Get details of a specific X/Twitter list',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                listId: {
+                  type: 'string',
+                  description: 'List ID to fetch',
+                },
+              },
+              required: ['listId'],
+            },
+          },
+          {
+            name: 'get_list_tweets',
+            description: 'Get tweets from a specific X/Twitter list',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                listId: {
+                  type: 'string',
+                  description: 'List ID to get tweets from',
+                },
+                limit: {
+                  type: 'number',
+                  description: 'Number of tweets to fetch (1-100)',
+                  minimum: 1,
+                  maximum: 100,
+                  default: 10,
+                },
+              },
+              required: ['listId'],
+            },
+          },
+          {
+            name: 'get_list_members',
+            description: 'Get members of a specific X/Twitter list',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                listId: {
+                  type: 'string',
+                  description: 'List ID to get members from',
+                },
+                limit: {
+                  type: 'number',
+                  description: 'Number of members to fetch (1-100)',
+                  minimum: 1,
+                  maximum: 100,
+                  default: 10,
+                },
+              },
+              required: ['listId'],
+            },
+          },
+          {
+            name: 'create_list',
+            description: 'Create a new X/Twitter list',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                name: {
+                  type: 'string',
+                  description: 'List name (max 25 characters)',
+                },
+                description: {
+                  type: 'string',
+                  description: 'List description (max 100 characters)',
+                },
+                private: {
+                  type: 'boolean',
+                  description: 'Whether the list should be private',
+                  default: false,
+                },
+              },
+              required: ['name'],
+            },
+          },
+          {
+            name: 'update_list',
+            description: 'Update an existing X/Twitter list',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                listId: {
+                  type: 'string',
+                  description: 'List ID to update',
+                },
+                name: {
+                  type: 'string',
+                  description: 'New list name (max 25 characters)',
+                },
+                description: {
+                  type: 'string',
+                  description: 'New list description (max 100 characters)',
+                },
+                private: {
+                  type: 'boolean',
+                  description: 'Whether the list should be private',
+                },
+              },
+              required: ['listId'],
+            },
+          },
+          {
+            name: 'delete_list',
+            description: 'Delete an X/Twitter list',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                listId: {
+                  type: 'string',
+                  description: 'List ID to delete',
+                },
+              },
+              required: ['listId'],
+            },
+          },
+          {
+            name: 'manage_list_member',
+            description: 'Add or remove a member from an X/Twitter list',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                listId: {
+                  type: 'string',
+                  description: 'List ID to manage',
+                },
+                username: {
+                  type: 'string',
+                  description: 'Username to add/remove (without @)',
+                },
+                action: {
+                  type: 'string',
+                  enum: ['add', 'remove'],
+                  description: 'Action to perform: add or remove member',
+                },
+              },
+              required: ['listId', 'username', 'action'],
+            },
+          },
         ];
         
         return {
@@ -306,6 +457,46 @@ class XProfileMCPServer {
           case 'manage_like': {
             const parsed = XTools.schemas.manageLike.parse(args);
             return await this.tools.manageLike(parsed);
+          }
+          
+          case 'get_my_lists': {
+            const parsed = XTools.schemas.getMyLists.parse(args);
+            return await this.tools.getMyLists(parsed);
+          }
+          
+          case 'get_list': {
+            const parsed = XTools.schemas.getList.parse(args);
+            return await this.tools.getList(parsed);
+          }
+          
+          case 'get_list_tweets': {
+            const parsed = XTools.schemas.getListTweets.parse(args);
+            return await this.tools.getListTweets(parsed);
+          }
+          
+          case 'get_list_members': {
+            const parsed = XTools.schemas.getListMembers.parse(args);
+            return await this.tools.getListMembers(parsed);
+          }
+          
+          case 'create_list': {
+            const parsed = XTools.schemas.createList.parse(args);
+            return await this.tools.createList(parsed);
+          }
+          
+          case 'update_list': {
+            const parsed = XTools.schemas.updateList.parse(args);
+            return await this.tools.updateList(parsed);
+          }
+          
+          case 'delete_list': {
+            const parsed = XTools.schemas.deleteList.parse(args);
+            return await this.tools.deleteList(parsed);
+          }
+          
+          case 'manage_list_member': {
+            const parsed = XTools.schemas.manageListMember.parse(args);
+            return await this.tools.manageListMember(parsed);
           }
           
           default:

@@ -66,6 +66,8 @@ export class OAuth2AuthManager {
       'bookmark.write',
       'like.read',
       'like.write',
+      'list.read',
+      'list.write',
       'offline.access'
     ];
     
