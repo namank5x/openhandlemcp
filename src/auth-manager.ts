@@ -24,9 +24,23 @@ export class OAuth2AuthManager {
   
   constructor() {
     this.config = this.getConfig();
-    this.tokensPath = path.join(process.cwd(), '.tokens.json');
+    this.tokensPath = this.getTokensPath();
   }
   
+  private getTokensPath(): string {
+    // Check for custom tokens path from environment variable
+    const customPath = process.env.X_TOKENS_PATH;
+    if (customPath) {
+      return customPath;
+    }
+    
+    // Get the project directory from the current module's location
+    const currentDir = path.dirname(new URL(import.meta.url).pathname);
+    const projectDir = path.resolve(currentDir, '..');
+    
+    return path.join(projectDir, '.tokens.json');
+  }
+
   private getConfig(): OAuth2Config {
     const clientId = process.env.X_CLIENT_ID;
     const clientSecret = process.env.X_CLIENT_SECRET;
